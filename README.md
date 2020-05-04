@@ -3,8 +3,7 @@
 A dmenu/rofi script to view and manage
 [todo.txt](https://github.com/todotxt/todo.txt-cli) lists.
 
-- Copy or symlink the script to your bin folder. `todo.sh` should be in your
-  $PATH
+- `go install todotxtmenu.go`
 - Create a keybinding to activate the script
 - Edit the configuration file if desired to add dmenu options or use a
   dmenu replacement such as Rofi:
