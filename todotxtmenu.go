@@ -27,20 +27,24 @@ func main() {
 	}
 	edit := true
 	for edit {
-		displayList := createMenu(&tasklist)
+		displayList, m := createMenu(&tasklist)
 		out := display(displayList.String(), dmenuOpts)
 		switch {
 		case out == "Add Item":
 			addItem(&tasklist)
+		case out != "":
+			id := m[out]
+			t, _ := tasklist.GetTask(id)
+			editItem(t)
 		default:
 			edit = false
-			fmt.Print(tasklist)
 		}
 	}
 }
 
-func createMenu(tasklist *todotxt.TaskList) strings.Builder {
+func createMenu(tasklist *todotxt.TaskList) (strings.Builder, map[string]int) {
 	var displayList strings.Builder
+	m := make(map[string]int)
 	displayList.WriteString("Add Item\n")
 	prior := tasklist.Filter(func(t todotxt.Task) bool {
 		return t.HasPriority()
@@ -49,6 +53,9 @@ func createMenu(tasklist *todotxt.TaskList) strings.Builder {
 		log.Fatal(err)
 	}
 	displayList.WriteString(prior.String())
+	for _, v := range *prior {
+		m[v.String()] = v.Id
+	}
 	nonprior := tasklist.Filter(func(t todotxt.Task) bool {
 		return !t.HasPriority()
 	})
@@ -56,12 +63,22 @@ func createMenu(tasklist *todotxt.TaskList) strings.Builder {
 		log.Fatal(err)
 	}
 	displayList.WriteString(nonprior.String())
-	return displayList
+	for _, v := range *nonprior {
+		m[v.String()] = v.Id
+	}
+	return displayList, m
 }
 
 func addItem(list *todotxt.TaskList) {
 	// Add new todo item
 	task := todotxt.NewTask()
+	task = editItem(&task)
+	if task.Todo != "" {
+		list.AddTask(&task)
+	}
+}
+
+func editItem(task *todotxt.Task) todotxt.Task {
 	edit := true
 	for edit {
 		var displayList strings.Builder
@@ -102,25 +119,10 @@ func addItem(list *todotxt.TaskList) {
 			}
 		default:
 			edit = false
-			if task.Todo != "" {
-				list.AddTask(&task)
-			}
 		}
 	}
+	return *task
 }
-
-// func todoTitle(list *todotxt.TaskList) *todotxt.TaskList {
-// Prompt for new Todo item
-// 	var displayList strings.Builder
-// 	item := display(displayList, dmenuOpts)
-// 	if item != "" {
-// 		task, err := todotxt.ParseTask(item)
-// 		if err != nil {
-// 			log.Fatal(err)
-// 		}
-// 		return task
-// 	}
-// }
 
 func display(list string, opts []string) (result string) {
 	// Displays list in dmenu, returns selection
