@@ -88,13 +88,22 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		} else {
 			tdd = task.DueDate.Format("2006-01-02")
 		}
+		var comp string
+		if task.Completed {
+			comp = "\nRestore item (uncomplete)"
+		} else {
+			comp = "\nComplete item"
+		}
 		fmt.Fprint(&displayList,
 			"Todo: "+task.Todo,
+			comp,
 			"\nPriority: "+task.Priority,
 			"\nProjects + (space separated): "+strings.Join(task.Projects, " "),
 			"\nContexts @ (space separated): "+strings.Join(task.Contexts, " "),
 			"\nDue date yyyy-mm-dd: "+tdd,
 			"\nThreshold yyyy-mm-dd: ",
+			"\n",
+			"\nDelete item",
 		)
 		out := display(displayList.String(), dmenuOpts)
 		switch {
@@ -117,6 +126,10 @@ func editItem(task *todotxt.Task) todotxt.Task {
 			} else {
 				task.DueDate = td
 			}
+		case strings.HasPrefix(out, "Complete item"):
+			task.Completed = true
+		case strings.HasPrefix(out, "Restore item"):
+			task.Completed = false
 		default:
 			edit = false
 		}
