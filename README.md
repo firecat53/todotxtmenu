@@ -3,22 +3,26 @@
 A dmenu/rofi script to view and manage
 [todo.txt](https://github.com/todotxt/todo.txt-cli) lists.
 
-- `go install todotxtmenu.go`
-- Create a keybinding to activate the script
-- Edit the configuration file if desired to add dmenu options or use a
-  dmenu replacement such as Rofi:
+### Installation
 
-```ini
-[dmenu]
-# dmenu_command = /usr/bin/dmenu
-# dmenu_command = /usr/bin/rofi -width 30 -theme todo
-# Rofi and dmenu are set to case insensitive by default `-i`
-# fn = -*-terminus-medium-*-*-*-16-*-*-*-*-*-*-*
-# fn = font string
-# nb = normal background (name, #RGB, or #RRGGBB)
-# nf = normal foreground
-# sb = selected background
-# sf = selected foreground
-# b =  (just set to empty value and menu will appear at the bottom
-# m = number of monitor to display on
-```
+- `go install todotxtmenu.go` OR [download binary](https://github.com/firecat53/todotxtmenu/releases)
+
+### Usage
+
+- Command line options:
+
+          -cmd string
+                Dmenu command to use (dmenu, rofi, wofi, etc) (default "dmenu")
+          -opts string
+                Additional Rofi/Dmenu options
+          -todo string
+                Path to todo file (default "todo.txt")
+
+- Configure Dmenu or Rofi using appropriate command line options or .Xresources
+  and pass using the `-opts` flag to todotxtmenu.
+  *NOTE* The `-i` flag is passed to both Dmenu and Rofi by default. The `-dmenu`
+  flag is passed to Rofi. Examples:
+  
+        todotxtmenu -cmd rofi -todo /home/user/todo/todo.txt -opts "-theme todotxtmenu"
+        todotxtmenu -todo /home/user/todo/todo.txt -opts
+            "-fn SourceCodePro-Regular:12 -b -l 10 -nf blue -nb black"

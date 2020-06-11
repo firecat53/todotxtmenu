@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"log"
 	"os/exec"
@@ -11,30 +12,29 @@ import (
 	"github.com/JamesClonk/go-todotxt"
 )
 
-var dmenuOpts = []string{
-	"rofi",
-	"-i",
-	"-dmenu",
-	"-multi-select",
-	"-theme",
-	"keepmenu",
-}
+var cmdPtr = flag.String("cmd", "dmenu", "Dmenu command to use (dmenu, rofi, wofi, etc)")
+var todoPtr = flag.String("todo", "todo.txt", "Path to todo file")
+var optsPtr = flag.String("opts", "", "Additional Rofi/Dmenu options")
 
 func main() {
-	tasklist, err := todotxt.LoadFromFilename("todo.txt")
+	flag.Parse()
+	tasklist, err := todotxt.LoadFromFilename(*todoPtr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	edit := true
-	for edit {
-		displayList, m := createMenu(&tasklist)
-		out := display(displayList.String(), dmenuOpts)
+	for edit := true; edit; {
+		displayList, m := createMenu(&tasklist, false)
+		out := display(displayList.String(), *todoPtr)
 		switch {
 		case out == "Add Item":
 			addItem(&tasklist)
+		case out == "Delete Item":
+			displayList, m = createMenu(&tasklist, true)
+			out = display(displayList.String(), "SELECTED ITEM WILL BE DELETED")
+			if err := tasklist.RemoveTaskById(m[out]); err != nil {
+			}
 		case out != "":
-			id := m[out]
-			t, _ := tasklist.GetTask(id)
+			t, _ := tasklist.GetTask(m[out])
 			editItem(t)
 		default:
 			edit = false
@@ -42,10 +42,15 @@ func main() {
 	}
 }
 
-func createMenu(tasklist *todotxt.TaskList) (strings.Builder, map[string]int) {
+func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[string]int) {
+	// Sort tasklist by prioritized items first, then non-pri items by created
+	// date. Don't display 'Add/Delete' options if del == true
 	var displayList strings.Builder
+	// Create map of task string->task Id's for reference
 	m := make(map[string]int)
-	displayList.WriteString("Add Item\n")
+	if !del {
+		displayList.WriteString("Add Item\nDelete Item\n")
+	}
 	prior := tasklist.Filter(func(t todotxt.Task) bool {
 		return t.HasPriority()
 	})
@@ -79,8 +84,7 @@ func addItem(list *todotxt.TaskList) {
 }
 
 func editItem(task *todotxt.Task) todotxt.Task {
-	edit := true
-	for edit {
+	for edit := true; edit; {
 		var displayList strings.Builder
 		var tdd string
 		if task.DueDate.IsZero() {
@@ -96,32 +100,38 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		}
 		fmt.Fprint(&displayList,
 			"Todo: "+task.Todo,
-			comp,
 			"\nPriority: "+task.Priority,
 			"\nProjects + (space separated): "+strings.Join(task.Projects, " "),
 			"\nContexts @ (space separated): "+strings.Join(task.Contexts, " "),
 			"\nDue date yyyy-mm-dd: "+tdd,
 			"\nThreshold yyyy-mm-dd: ",
 			"\n",
-			"\nDelete item",
+			comp,
 		)
-		out := display(displayList.String(), dmenuOpts)
+		out := display(displayList.String(), task.String())
 		switch {
 		case strings.HasPrefix(out, "Todo"):
-			task.Todo = display(task.Todo, append(dmenuOpts, "-p", "Todo Title: "))
+			task.Todo = display(task.Todo, "Todo Title: ")
 		case strings.HasPrefix(out, "Priority"):
-			task.Priority = strings.ToUpper(display(task.Priority, append(dmenuOpts, "-p", "Priority:")))
+			// Convert this to []rune to allow comparison to 'A' and 'Z' instead
+			// of adding regex or unicode dependency
+			p := []rune(strings.ToUpper(display(task.Priority, "Priority:")))
+			if len(p) > 1 || (len(p) > 0 && (p[0] < 'A' || p[0] > 'Z')) {
+				display("", "Priority must be single letter A-Z")
+				break
+			}
+			task.Priority = string(p)
 		case strings.HasPrefix(out, "Projects"):
-			p := display(strings.Join(task.Projects, " "), append(dmenuOpts, "-p", "Projects (+):"))
+			p := display(strings.Join(task.Projects, " "), "Projects (+):")
 			task.Projects = strings.Split(p, " ")
 		case strings.HasPrefix(out, "Contexts"):
-			p := display(strings.Join(task.Contexts, " "), append(dmenuOpts, "-p", "Contexts (@):"))
+			p := display(strings.Join(task.Contexts, " "), "Contexts (@):")
 			task.Contexts = strings.Split(p, " ")
 		case strings.HasPrefix(out, "Due date"):
-			t := display(tdd, append(dmenuOpts, "-p", "Due Date (yyyy-mm-dd):"))
+			t := display(tdd, "Due Date (yyyy-mm-dd):")
 			td, err := time.Parse("2006-01-02", t)
 			if err != nil {
-				display("", append(dmenuOpts, "-p", "Bad date format"))
+				display("", "Bad date format. Should be yyyy-mm-dd.")
 				break
 			} else {
 				task.DueDate = td
@@ -129,6 +139,8 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		case strings.HasPrefix(out, "Complete item"):
 			task.Completed = true
 		case strings.HasPrefix(out, "Restore item"):
+			task.Reopen()
+		case strings.HasPrefix(out, "Delete item"):
 			task.Completed = false
 		default:
 			edit = false
@@ -137,11 +149,20 @@ func editItem(task *todotxt.Task) todotxt.Task {
 	return *task
 }
 
-func display(list string, opts []string) (result string) {
+func display(list string, title string) (result string) {
 	// Displays list in dmenu, returns selection
-	var out bytes.Buffer
-	var outErr bytes.Buffer
-	cmd := exec.Command(opts[0], opts[1:]...)
+	var out, outErr bytes.Buffer
+	flag.Parse()
+	opts := strings.Split(*optsPtr, " ")
+	o := []string{"-i", "-p", title}
+	if *cmdPtr == "rofi" {
+		o = []string{"-i", "-dmenu", "-p", title}
+	}
+	// Remove empty "" from dmenu args that would cause a dmenu error
+	if opts[0] != "" {
+		opts = append(o, opts...)
+	}
+	cmd := exec.Command(*cmdPtr, opts...)
 	cmd.Stdout = &out
 	cmd.Stderr = &outErr
 	cmd.Stdin = strings.NewReader(list)

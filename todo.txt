@@ -1,0 +1,41 @@
+2016-01-22 tabview fix file size display @tech +tabview
+2016-01-22 tabview fix file size display @tech +tabview do something different.  Like the quick brown fox jumped over the lazy dog.
+2014-01-31 Fix archive mail script @tech +problems
+2014-02-06 Investigate NMAA secure storage for important documents @home
+2014-08-16 Investigate git hooks for auto pypi uploads. @tech
+2015-03-24 python curses md/rst browser? @tech
+(C) 2017-03-08 Timers for bathroom fans @house +upgrades
+(B) 2017-03-08 shower door bottom seal @house +maintenance
+2017-03-08 Drain pan and moisture alarm for washer @house +upgrades
+2017-03-08 Extend kitchen cabinets @house +upgrades
+2017-03-08 Create walk in shower in master @house +upgrades
+(B) 2017-03-08 Laundry room cabinets @house +upgrades
+(B) 2017-03-08 Redo life insurance -- don't have enough @home
+2017-03-12 Syncthing terminal UI @tech
+(A) 2017-03-15 Fix top drawer in little dresser @house +maintenance
+2017-04-09 Update bash scripts @tech
+(B) 2017-05-15 NE gutter clogged? @house +maintenance
+2017-05-15 French doors for basement @house +upgrades
+2017-08-26 BBQ grill brush @shopping
+(B) 2017-09-20 Protect downstairs wiring @house +maintenance
+(B) 2018-01-12 Template for target hazard info @fire
+(D) 2018-03-29 Charging station @home @house
+2018-06-22 Add a do-nothgo symbol for maps @fire
+(B) 2018-08-31 investigate Sigal/B2 for photos site @tech
+2018-09-21 Old Main walkthrough, premise info powerpoint @fire +prefire +wwu
+2018-09-21 ALS Ambulance inventory (indefinitely delayed) @fire +checklists
+2018-09-21 Add ladder and rope logs to engine/ladder weekly checks @fire +checklists
+2018-11-10 Generic template for SCBA post-use checks? @fire +checklists
+(B) 2018-11-25 automate running the docker update checker and rebuilding its results @tech
+(B) 2019-01-30 Mazda tires x2 @home
+(A) 2019-03-07 Finish outside faucet @home @house t:2019-06-07
+(C) 2019-03-29 rainwater collection @home
+(C) 2019-04-21 YMCA walkthrough/ppt @fire
+(C) 2019-04-24 convert docker to podman @tech
+(C) 2019-05-13 Scan old pics from Mom @home
+(A) 2019-05-14 Schedule NMAA call @home
+(A) 2020-03-12 FAFSA @home
+2020-03-29 Sunflower seeds +groceries
+x 2020-04-25 2020-04-25 Mozarella +groceries
+(A) 2020-04-29 fix check_mk docker exec journal spam @tech
+2020-05-03 Milk +groceries
