@@ -20,7 +20,7 @@ func main() {
 	flag.Parse()
 	tasklist, err := todotxt.LoadFromFilename(*todoPtr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 	for edit := true; edit; {
 		displayList, m := createMenu(&tasklist, false)
@@ -55,7 +55,7 @@ func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[stri
 		return t.HasPriority()
 	})
 	if err := prior.Sort(todotxt.SORT_PRIORITY_ASC); err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 	displayList.WriteString(prior.String())
 	for _, v := range *prior {
@@ -65,7 +65,7 @@ func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[stri
 		return !t.HasPriority()
 	})
 	if err := nonprior.Sort(todotxt.SORT_CREATED_DATE_DESC); err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 	displayList.WriteString(nonprior.String())
 	for _, v := range *nonprior {
@@ -98,13 +98,22 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		} else {
 			comp = "\nComplete item"
 		}
+		var tags, thd string
+		for k, v := range task.AdditionalTags {
+			if k == "t" {
+				thd = v
+				continue
+			}
+			tags = "\n" + tags + k + ": " + v
+		}
 		fmt.Fprint(&displayList,
 			"Todo: "+task.Todo,
 			"\nPriority: "+task.Priority,
 			"\nProjects + (space separated): "+strings.Join(task.Projects, " "),
 			"\nContexts @ (space separated): "+strings.Join(task.Contexts, " "),
 			"\nDue date yyyy-mm-dd: "+tdd,
-			"\nThreshold yyyy-mm-dd: ",
+			"\nThreshold date yyyy-mm-dd: "+thd,
+			tags,
 			"\n",
 			comp,
 		)
@@ -130,11 +139,26 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		case strings.HasPrefix(out, "Due date"):
 			t := display(tdd, "Due Date (yyyy-mm-dd):")
 			td, err := time.Parse("2006-01-02", t)
-			if err != nil {
+			if err != nil && t != "" {
 				display("", "Bad date format. Should be yyyy-mm-dd.")
 				break
 			} else {
 				task.DueDate = td
+			}
+		case strings.HasPrefix(out, "Threshold"):
+			t := display(thd, "Threshold Date (yyyy-mm-dd):")
+			td, err := time.Parse("2006-01-02", t)
+			if err != nil && t != "" {
+				display("", "Bad date format. Should be yyyy-mm-dd.")
+				break
+			} else {
+				// Threshold date is an additional tag and stored as a string
+				// not as a time object
+				if td.IsZero() {
+					task.AdditionalTags["t"] = ""
+				} else {
+					task.AdditionalTags["t"] = td.Format("2006-01-02")
+				}
 			}
 		case strings.HasPrefix(out, "Complete item"):
 			task.Completed = true
@@ -142,6 +166,17 @@ func editItem(task *todotxt.Task) todotxt.Task {
 			task.Reopen()
 		case strings.HasPrefix(out, "Delete item"):
 			task.Completed = false
+		case out != "":
+			// TODO remove tag from AdditionalTags if empty
+			for k, v := range task.AdditionalTags {
+				if k == "t" {
+					continue
+				}
+				if strings.HasPrefix(out, k) {
+					task.AdditionalTags[k] = display(v, k)
+					break
+				}
+			}
 		default:
 			edit = false
 		}
@@ -169,11 +204,15 @@ func display(list string, title string) (result string) {
 	err := cmd.Run()
 	if err != nil {
 		if outErr.String() != "" {
-			log.Fatal(outErr)
+			log.Fatal(outErr.String())
 		} else {
-			return
+			// Skip this error when hitting Esc to go back to previous menu
+			if err.Error() == "exit status 1" {
+				return
+			}
+			log.Fatal(err.Error())
 		}
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 	result = strings.TrimRight(out.String(), "\n")
 	return
