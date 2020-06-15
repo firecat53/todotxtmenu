@@ -28,14 +28,9 @@ func main() {
 		switch {
 		case out == "Add Item":
 			addItem(&tasklist)
-		case out == "Delete Item":
-			displayList, m = createMenu(&tasklist, true)
-			out = display(displayList.String(), "SELECTED ITEM WILL BE DELETED")
-			if err := tasklist.RemoveTaskById(m[out]); err != nil {
-			}
 		case out != "":
 			t, _ := tasklist.GetTask(m[out])
-			editItem(t)
+			editItem(t, &tasklist)
 		default:
 			edit = false
 		}
@@ -50,7 +45,7 @@ func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[stri
 	// date. Don't display 'Add/Delete' options if del == true
 	var displayList strings.Builder
 	if !del {
-		displayList.WriteString("Add Item\nDelete Item\n")
+		displayList.WriteString("Add Item\n")
 	}
 	prior := tasklist.Filter(func(t todotxt.Task) bool {
 		return t.HasPriority() && !t.Completed
@@ -82,13 +77,13 @@ func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[stri
 func addItem(list *todotxt.TaskList) {
 	// Add new todo item
 	task := todotxt.NewTask()
-	task = editItem(&task)
+	task = editItem(&task, list)
 	if task.Todo != "" {
 		list.AddTask(&task)
 	}
 }
 
-func editItem(task *todotxt.Task) todotxt.Task {
+func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 	for edit := true; edit; {
 		// Initialize AdditionalTags if not already
 		if len(task.AdditionalTags) == 0 {
@@ -175,7 +170,11 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		case strings.HasPrefix(out, "Restore item"):
 			task.Reopen()
 		case strings.HasPrefix(out, "Delete item"):
-			// TODO
+			if err := tasklist.RemoveTaskById(task.Id); err != nil {
+				// new tasks don't have an Id yet
+				task.Todo = ""
+			}
+			edit = false
 		case out != "":
 			for k, v := range task.AdditionalTags {
 				if k == "t" {
@@ -193,7 +192,9 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		default:
 			edit = false
 		}
-		task, _ = todotxt.ParseTask(task.String())
+		if task.Todo != "" {
+			task, _ = todotxt.ParseTask(task.String())
+		}
 	}
 	return *task
 }
