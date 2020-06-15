@@ -211,6 +211,8 @@ func display(list string, title string) (result string) {
 	// Remove empty "" from dmenu args that would cause a dmenu error
 	if opts[0] != "" {
 		opts = append(o, opts...)
+	} else {
+		opts = o
 	}
 	cmd := exec.Command(*cmdPtr, opts...)
 	cmd.Stdout = &out
