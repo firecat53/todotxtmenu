@@ -97,10 +97,12 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 			tdd = task.DueDate.Format("2006-01-02")
 		}
 		var comp string
-		if task.Completed {
-			comp = "Restore item (uncomplete)"
+		if len(task.Todo) == 0 {
+			comp = ""
+		} else if task.Completed {
+			comp = "Restore item (uncomplete)\n\n"
 		} else {
-			comp = "Complete item"
+			comp = "Complete item\n\n"
 		}
 		var tags, thd string
 		for k, v := range task.AdditionalTags {
@@ -113,7 +115,7 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 		}
 		fmt.Fprint(&displayList,
 			comp,
-			"\n\nTodo: "+task.Todo,
+			"Title: "+task.Todo,
 			"\nPriority: "+task.Priority,
 			"\nContexts @ (space separated): "+strings.Join(task.Contexts, " "),
 			"\nProjects + (space separated): "+strings.Join(task.Projects, " "),
@@ -124,7 +126,7 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 		)
 		out := display(displayList.String(), task.String())
 		switch {
-		case strings.HasPrefix(out, "Todo"):
+		case strings.HasPrefix(out, "Title"):
 			task.Todo = display(task.Todo, "Todo Title: ")
 		case strings.HasPrefix(out, "Priority"):
 			// Convert this to []rune to allow comparison to 'A' and 'Z' instead
