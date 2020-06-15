@@ -40,35 +40,40 @@ func main() {
 			edit = false
 		}
 	}
+	if err := todotxt.WriteToFilename(&tasklist, *todoPtr); err != nil {
+		log.Fatal(err.Error())
+	}
 }
 
 func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[string]int) {
 	// Sort tasklist by prioritized items first, then non-pri items by created
 	// date. Don't display 'Add/Delete' options if del == true
 	var displayList strings.Builder
-	// Create map of task string->task Id's for reference
-	m := make(map[string]int)
 	if !del {
 		displayList.WriteString("Add Item\nDelete Item\n")
 	}
 	prior := tasklist.Filter(func(t todotxt.Task) bool {
-		return t.HasPriority()
+		return t.HasPriority() && !t.Completed
 	})
 	if err := prior.Sort(todotxt.SORT_PRIORITY_ASC); err != nil {
 		log.Fatal(err.Error())
 	}
-	displayList.WriteString(prior.String())
-	for _, v := range *prior {
-		m[v.String()] = v.Id
-	}
 	nonprior := tasklist.Filter(func(t todotxt.Task) bool {
-		return !t.HasPriority()
+		return !t.HasPriority() && !t.Completed
 	})
 	if err := nonprior.Sort(todotxt.SORT_CREATED_DATE_DESC); err != nil {
 		log.Fatal(err.Error())
 	}
-	displayList.WriteString(nonprior.String())
-	for _, v := range *nonprior {
+	done := tasklist.Filter(func(t todotxt.Task) bool {
+		return t.Completed
+	})
+	if err := done.Sort(todotxt.SORT_CREATED_DATE_DESC); err != nil {
+		log.Fatal(err.Error())
+	}
+	displayList.WriteString(prior.String() + nonprior.String() + done.String())
+	// Create map of task string->task Id's for reference
+	m := make(map[string]int)
+	for _, v := range append(*prior, append(*nonprior, *done...)...) {
 		m[v.String()] = v.Id
 	}
 	return displayList, m
@@ -85,6 +90,10 @@ func addItem(list *todotxt.TaskList) {
 
 func editItem(task *todotxt.Task) todotxt.Task {
 	for edit := true; edit; {
+		// Initialize AdditionalTags if not already
+		if len(task.AdditionalTags) == 0 {
+			task.AdditionalTags = make(map[string]string)
+		}
 		var displayList strings.Builder
 		var tdd string
 		if task.DueDate.IsZero() {
@@ -94,28 +103,29 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		}
 		var comp string
 		if task.Completed {
-			comp = "\nRestore item (uncomplete)"
+			comp = "Restore item (uncomplete)"
 		} else {
-			comp = "\nComplete item"
+			comp = "Complete item"
 		}
 		var tags, thd string
 		for k, v := range task.AdditionalTags {
 			if k == "t" {
+				// Handle threshold (t:) tag
 				thd = v
 				continue
 			}
-			tags = "\n" + tags + k + ": " + v
+			tags = tags + "\n" + k + ": " + v
 		}
 		fmt.Fprint(&displayList,
-			"Todo: "+task.Todo,
+			comp,
+			"\n\nTodo: "+task.Todo,
 			"\nPriority: "+task.Priority,
-			"\nProjects + (space separated): "+strings.Join(task.Projects, " "),
 			"\nContexts @ (space separated): "+strings.Join(task.Contexts, " "),
+			"\nProjects + (space separated): "+strings.Join(task.Projects, " "),
 			"\nDue date yyyy-mm-dd: "+tdd,
 			"\nThreshold date yyyy-mm-dd: "+thd,
 			tags,
-			"\n",
-			comp,
+			"\n\nDelete item",
 		)
 		out := display(displayList.String(), task.String())
 		switch {
@@ -155,7 +165,7 @@ func editItem(task *todotxt.Task) todotxt.Task {
 				// Threshold date is an additional tag and stored as a string
 				// not as a time object
 				if td.IsZero() {
-					task.AdditionalTags["t"] = ""
+					delete(task.AdditionalTags, "t")
 				} else {
 					task.AdditionalTags["t"] = td.Format("2006-01-02")
 				}
@@ -165,21 +175,25 @@ func editItem(task *todotxt.Task) todotxt.Task {
 		case strings.HasPrefix(out, "Restore item"):
 			task.Reopen()
 		case strings.HasPrefix(out, "Delete item"):
-			task.Completed = false
+			// TODO
 		case out != "":
-			// TODO remove tag from AdditionalTags if empty
 			for k, v := range task.AdditionalTags {
 				if k == "t" {
 					continue
 				}
 				if strings.HasPrefix(out, k) {
-					task.AdditionalTags[k] = display(v, k)
+					if t := display(v, k); t == "" {
+						delete(task.AdditionalTags, k)
+					} else {
+						task.AdditionalTags[k] = t
+					}
 					break
 				}
 			}
 		default:
 			edit = false
 		}
+		task, _ = todotxt.ParseTask(task.String())
 	}
 	return *task
 }
