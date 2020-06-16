@@ -5,7 +5,7 @@ A dmenu/rofi script to view and manage
 
 ### Installation
 
-- `go install todotxtmenu.go` OR [download binary](https://github.com/firecat53/todotxtmenu/releases)
+- `go get github.com/firecat53/todotxtmenu.go` OR [download binary](https://github.com/firecat53/todotxtmenu/releases)
 
 ### Usage
 
@@ -14,7 +14,7 @@ A dmenu/rofi script to view and manage
           -cmd string
                 Dmenu command to use (dmenu, rofi, wofi, etc) (default "dmenu")
           -opts string
-                Additional Rofi/Dmenu options
+                Additional Rofi/Dmenu options (default "")
           -todo string
                 Path to todo file (default "todo.txt")
 
