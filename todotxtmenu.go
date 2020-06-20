@@ -5,16 +5,19 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/JamesClonk/go-todotxt"
 )
 
+var archPtr = flag.Bool("archive", true, "Move completed items to done.txt")
 var cmdPtr = flag.String("cmd", "dmenu", "Dmenu command to use (dmenu, rofi, wofi, etc)")
-var todoPtr = flag.String("todo", "todo.txt", "Path to todo file")
 var optsPtr = flag.String("opts", "", "Additional Rofi/Dmenu options")
+var todoPtr = flag.String("todo", "todo.txt", "Path to todo file")
 
 func main() {
 	flag.Parse()
@@ -35,14 +38,45 @@ func main() {
 			edit = false
 		}
 	}
+	if *archPtr {
+		archiveDone(&tasklist)
+	}
 	if err := todotxt.WriteToFilename(&tasklist, *todoPtr); err != nil {
 		log.Fatal(err.Error())
 	}
 }
 
+func archiveDone(tasklist *todotxt.TaskList) {
+	// Archive completed items to <path/to/done.txt>
+	path := filepath.Join(filepath.Dir(*todoPtr), "done.txt")
+	// create done.txt if necessary
+	file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	file.Close()
+	alldone, err := todotxt.LoadFromFilename(path)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	done := tasklist.Filter(func(t todotxt.Task) bool {
+		return t.Completed
+	})
+	for _, t := range *done {
+		if err := tasklist.RemoveTaskById(t.Id); err != nil {
+			fmt.Printf("Unable to remove task #%s", t.String())
+		}
+	}
+	x := append(alldone, *done...)
+	if err := todotxt.WriteToFilename(&x, path); err != nil {
+		log.Fatal(err.Error())
+	}
+}
+
 func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[string]int) {
-	// Sort tasklist by prioritized items first, then non-pri items by created
-	// date. Don't display 'Add/Delete' options if del == true
+	// Sort tasklist by prioritized items first, then non-pri items, then
+	// completed items by created date. Don't display 'Add/Delete' options if
+	// del == true
 	var displayList strings.Builder
 	if !del {
 		displayList.WriteString("Add Item\n")

@@ -11,6 +11,8 @@ A dmenu/rofi script to view and manage
 
 - Command line options:
 
+          -archive=<true/false>
+                Archive completed items to `done.txt` on exit (default true)
           -cmd string
                 Dmenu command to use (dmenu, rofi, wofi, etc) (default "dmenu")
           -opts string
