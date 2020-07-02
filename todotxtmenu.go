@@ -127,10 +127,12 @@ func checkThreshold(t todotxt.Task) bool {
 
 func addItem(list *todotxt.TaskList) {
 	// Add new todo item
-	task := todotxt.NewTask()
-	task = editItem(&task, list)
-	if task.Todo != "" {
-		list.AddTask(&task)
+	t := todotxt.NewTask()
+	t.Todo = display(t.Todo, "Todo Title: ")
+	task, _ := todotxt.ParseTask(t.String())
+	task1 := editItem(task, list)
+	if task1.Todo != "" {
+		list.AddTask(&task1)
 	}
 }
 
