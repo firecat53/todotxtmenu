@@ -17,6 +17,7 @@ import (
 var archPtr = flag.Bool("archive", true, "Move completed items to done.txt")
 var cmdPtr = flag.String("cmd", "dmenu", "Dmenu command to use (dmenu, rofi, wofi, etc)")
 var optsPtr = flag.String("opts", "", "Additional Rofi/Dmenu options")
+var thresholdPtr = flag.Bool("threshold", false, "Hide items before their threshold date")
 var todoPtr = flag.String("todo", "todo.txt", "Path to todo file")
 
 func main() {
@@ -82,13 +83,13 @@ func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[stri
 		displayList.WriteString("Add Item\n")
 	}
 	prior := tasklist.Filter(func(t todotxt.Task) bool {
-		return t.HasPriority() && !t.Completed
+		return t.HasPriority() && !t.Completed && checkThreshold(t)
 	})
 	if err := prior.Sort(todotxt.SORT_PRIORITY_ASC); err != nil {
 		log.Fatal(err.Error())
 	}
 	nonprior := tasklist.Filter(func(t todotxt.Task) bool {
-		return !t.HasPriority() && !t.Completed
+		return !t.HasPriority() && !t.Completed && checkThreshold(t)
 	})
 	if err := nonprior.Sort(todotxt.SORT_CREATED_DATE_DESC); err != nil {
 		log.Fatal(err.Error())
@@ -106,6 +107,22 @@ func createMenu(tasklist *todotxt.TaskList, del bool) (strings.Builder, map[stri
 		m[v.String()] = v.Id
 	}
 	return displayList, m
+}
+
+func checkThreshold(t todotxt.Task) bool {
+	// Return true if threshold date is before now, date doesn't parse
+	// correctly, or -threshold isn't set. False if td in the future
+	if !*thresholdPtr {
+		return true
+	}
+	if d, ok := t.AdditionalTags["t"]; ok {
+		td, err := time.Parse("2006-01-02", d)
+		if err != nil && d != "" {
+			return true
+		}
+		return td.Before(time.Now())
+	}
+	return true
 }
 
 func addItem(list *todotxt.TaskList) {

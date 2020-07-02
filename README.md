@@ -19,6 +19,8 @@ A dmenu/rofi script to view and manage
                 Additional Rofi/Dmenu options (default "")
           -todo string
                 Path to todo file (default "todo.txt")
+          -threshold
+                Hide items before their threshold date (default false)
 
 - Configure Dmenu or Rofi using appropriate command line options or .Xresources
   and pass using the `-opts` flag to todotxtmenu.
