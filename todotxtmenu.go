@@ -129,7 +129,10 @@ func addItem(list *todotxt.TaskList) {
 	// Add new todo item
 	t := todotxt.NewTask()
 	t.Todo = display(t.Todo, "Todo Title: ")
-	task, _ := todotxt.ParseTask(t.String())
+	task := &t
+	if t.Todo != "" {
+		task, _ = todotxt.ParseTask(t.String())
+	}
 	task1 := editItem(task, list)
 	if task1.Todo != "" {
 		list.AddTask(&task1)
