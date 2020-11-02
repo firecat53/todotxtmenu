@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -139,29 +140,56 @@ func addItem(list *todotxt.TaskList) {
 	}
 }
 
+func getAllProjCont(tasklist *todotxt.TaskList) (projects []string, contexts []string) {
+	// Return arrays of all projects and all contexts
+	for _, v := range *tasklist {
+		projects = append(v.Projects, projects...)
+		contexts = append(v.Contexts, contexts...)
+	}
+	p, c := dedupeList(projects), dedupeList(contexts)
+	sort.Strings(p)
+	sort.Strings(c)
+	return p, c
+}
+
+func dedupeList(list []string) (result []string) {
+	// Given a list of strings, remove duplicates and return
+	flag := make(map[string]bool)
+	for _, name := range list {
+		if flag[name] == false {
+			flag[name] = true
+			result = append(result, name)
+		}
+	}
+	return
+}
+
 func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
+	projects, contexts := getAllProjCont(tasklist)
+	taskOrig := task.String()
+	t, _ := todotxt.ParseTask(taskOrig)
 	for edit := true; edit; {
 		// Initialize AdditionalTags if not already
-		if len(task.AdditionalTags) == 0 {
-			task.AdditionalTags = make(map[string]string)
+		if len(t.AdditionalTags) == 0 {
+			t.AdditionalTags = make(map[string]string)
 		}
 		var displayList strings.Builder
 		var tdd string
-		if task.DueDate.IsZero() {
+		if t.DueDate.IsZero() {
 			tdd = ""
 		} else {
-			tdd = task.DueDate.Format("2006-01-02")
+			tdd = t.DueDate.Format("2006-01-02")
 		}
 		var comp string
-		if len(task.Todo) == 0 {
+		if len(t.Todo) == 0 {
 			comp = ""
-		} else if task.Completed {
+		} else if t.Completed {
 			comp = "Restore item (uncomplete)\n\n"
 		} else {
 			comp = "Complete item\n\n"
 		}
 		var tags, thd string
-		for k, v := range task.AdditionalTags {
+		for k, v := range t.AdditionalTags {
 			if k == "t" {
 				// Handle threshold (t:) tag
 				thd = v
@@ -170,79 +198,93 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 			tags = tags + "\n" + k + ": " + v
 		}
 		fmt.Fprint(&displayList,
+			"Save item\n",
 			comp,
-			"Title: "+task.Todo,
-			"\nPriority: "+task.Priority,
-			"\nContexts @ (space separated): "+strings.Join(task.Contexts, " "),
-			"\nProjects + (space separated): "+strings.Join(task.Projects, " "),
+			"Title: "+t.Todo,
+			"\nPriority: "+t.Priority,
+			"\nContexts @ (space separated): "+strings.Join(t.Contexts, " "),
+			"\nProjects + (space separated): "+strings.Join(t.Projects, " "),
 			"\nDue date yyyy-mm-dd: "+tdd,
 			"\nThreshold date yyyy-mm-dd: "+thd,
 			tags,
 			"\n\nDelete item",
 		)
-		out := display(displayList.String(), task.String())
+		out := display(displayList.String(), t.String())
 		switch {
+		case out == "Save item":
+			edit = false
+			*task = *t
 		case strings.HasPrefix(out, "Title"):
-			task.Todo = display(task.Todo, "Todo Title: ")
+			t.Todo = display(t.Todo, "Todo Title: ")
 		case strings.HasPrefix(out, "Priority"):
 			// Convert this to []rune to allow comparison to 'A' and 'Z' instead
 			// of adding regex or unicode dependency
-			p := []rune(strings.ToUpper(display(task.Priority, "Priority:")))
+			p := []rune(strings.ToUpper(display(t.Priority, "Priority:")))
 			if len(p) > 1 || (len(p) > 0 && (p[0] < 'A' || p[0] > 'Z')) {
 				display("", "Priority must be single letter A-Z")
 				break
 			}
-			task.Priority = string(p)
+			t.Priority = string(p)
 		case strings.HasPrefix(out, "Projects"):
-			p := display(strings.Join(task.Projects, " "), "Projects (+):")
-			task.Projects = strings.Split(p, " ")
+			prj := strings.Join(t.Projects, " ") + "\n\n" + strings.Join(projects, "\n")
+			p := display(prj, "Projects (+):")
+			if p != "" {
+				t.Projects = strings.Split(p, " ")
+			} else {
+				t.Projects = []string{}
+			}
 		case strings.HasPrefix(out, "Contexts"):
-			p := display(strings.Join(task.Contexts, " "), "Contexts (@):")
-			task.Contexts = strings.Split(p, " ")
+			cont := strings.Join(t.Contexts, " ") + "\n\n" + strings.Join(contexts, "\n")
+			c := display(cont, "Contexts (+):")
+			if c != "" {
+				t.Contexts = strings.Split(c, " ")
+			} else {
+				t.Contexts = []string{}
+			}
 		case strings.HasPrefix(out, "Due date"):
-			t := display(tdd, "Due Date (yyyy-mm-dd):")
-			td, err := time.Parse("2006-01-02", t)
-			if err != nil && t != "" {
+			d := display(tdd, "Due Date (yyyy-mm-dd):")
+			td, err := time.Parse("2006-01-02", d)
+			if err != nil && d != "" {
 				display("", "Bad date format. Should be yyyy-mm-dd.")
 				break
 			} else {
-				task.DueDate = td
+				t.DueDate = td
 			}
 		case strings.HasPrefix(out, "Threshold"):
-			t := display(thd, "Threshold Date (yyyy-mm-dd):")
-			td, err := time.Parse("2006-01-02", t)
-			if err != nil && t != "" {
+			d := display(thd, "Threshold Date (yyyy-mm-dd):")
+			td, err := time.Parse("2006-01-02", d)
+			if err != nil && d != "" {
 				display("", "Bad date format. Should be yyyy-mm-dd.")
 				break
 			} else {
 				// Threshold date is an additional tag and stored as a string
 				// not as a time object
 				if td.IsZero() {
-					delete(task.AdditionalTags, "t")
+					delete(t.AdditionalTags, "t")
 				} else {
-					task.AdditionalTags["t"] = td.Format("2006-01-02")
+					t.AdditionalTags["t"] = td.Format("2006-01-02")
 				}
 			}
 		case strings.HasPrefix(out, "Complete item"):
-			task.Completed = true
+			t.Completed = true
 		case strings.HasPrefix(out, "Restore item"):
-			task.Reopen()
+			t.Reopen()
 		case strings.HasPrefix(out, "Delete item"):
 			if err := tasklist.RemoveTaskById(task.Id); err != nil {
 				// new tasks don't have an Id yet
-				task.Todo = ""
+				t.Todo = ""
 			}
 			edit = false
 		case out != "":
-			for k, v := range task.AdditionalTags {
+			for k, v := range t.AdditionalTags {
 				if k == "t" {
 					continue
 				}
 				if strings.HasPrefix(out, k) {
-					if t := display(v, k); t == "" {
-						delete(task.AdditionalTags, k)
+					if d := display(v, k); d == "" {
+						delete(t.AdditionalTags, k)
 					} else {
-						task.AdditionalTags[k] = t
+						t.AdditionalTags[k] = d
 					}
 					break
 				}
@@ -250,8 +292,8 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 		default:
 			edit = false
 		}
-		if task.Todo != "" {
-			task, _ = todotxt.ParseTask(task.String())
+		if t.Todo != "" {
+			t, _ = todotxt.ParseTask(t.String())
 		}
 	}
 	return *task
