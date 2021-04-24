@@ -15,6 +15,8 @@ A dmenu/rofi script to view and manage
                 Archive completed items to `done.txt` on exit (default true)
           -cmd string
                 Dmenu command to use (dmenu, rofi, wofi, etc) (default "dmenu")
+          -no-created-date
+                Don't automatically add a date when creating a new item
           -opts string
                 Additional Rofi/Dmenu options (default "")
           -todo string

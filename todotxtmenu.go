@@ -17,6 +17,7 @@ import (
 
 var archPtr = flag.Bool("archive", true, "Move completed items to done.txt")
 var cmdPtr = flag.String("cmd", "dmenu", "Dmenu command to use (dmenu, rofi, wofi, etc)")
+var createdDatePtr = flag.Bool("no-created-date", false, "Set CreatedDate when adding new task")
 var optsPtr = flag.String("opts", "", "Additional Rofi/Dmenu options")
 var thresholdPtr = flag.Bool("threshold", false, "Hide items before their threshold date")
 var todoPtr = flag.String("todo", "todo.txt", "Path to todo file")
@@ -133,6 +134,10 @@ func addItem(list *todotxt.TaskList) {
 	task := &t
 	if t.Todo != "" {
 		task, _ = todotxt.ParseTask(t.String())
+	}
+	if *createdDatePtr {
+		// Zero Created Date if -no-created-date is set
+		task.CreatedDate = time.Time{}
 	}
 	task1 := editItem(task, list)
 	if task1.Todo != "" {
