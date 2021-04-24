@@ -277,7 +277,7 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 		case strings.HasPrefix(out, "Delete item"):
 			if err := tasklist.RemoveTaskById(task.Id); err != nil {
 				// new tasks don't have an Id yet
-				t.Todo = ""
+				task.Todo = ""
 			}
 			edit = false
 		case out != "":
