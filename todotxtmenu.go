@@ -296,6 +296,10 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 			}
 		default:
 			edit = false
+			// Cancel new item if ESC is hit without saving
+			if t.Id == 0 {
+				task.Todo = ""
+			}
 		}
 		if t.Todo != "" {
 			t, _ = todotxt.ParseTask(t.String())
