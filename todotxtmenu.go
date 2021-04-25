@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -30,7 +31,7 @@ func main() {
 	}
 	for edit := true; edit; {
 		displayList, m := createMenu(&tasklist, false)
-		out := display(displayList.String(), *todoPtr)
+		out, _ := display(displayList.String(), *todoPtr)
 		switch {
 		case out == "Add Item":
 			addItem(&tasklist)
@@ -130,7 +131,11 @@ func checkThreshold(t todotxt.Task) bool {
 func addItem(list *todotxt.TaskList) {
 	// Add new todo item
 	t := todotxt.NewTask()
-	t.Todo = display(t.Todo, "Todo Title: ")
+	var e error
+	t.Todo, e = display(t.Todo, "Todo Title: ")
+	if e != nil {
+		return
+	}
 	task := &t
 	if t.Todo != "" {
 		task, _ = todotxt.ParseTask(t.String())
@@ -214,60 +219,73 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 			tags,
 			"\n\nDelete item",
 		)
-		out := display(displayList.String(), t.String())
+		out, e := display(displayList.String(), t.String())
+		// Cancel new item if ESC is hit without saving
+		if e != nil {
+			if task.Id == 0 {
+				task.Todo = ""
+			}
+			return *task
+		}
 		switch {
 		case out == "Save item":
 			edit = false
 			*task = *t
 		case strings.HasPrefix(out, "Title"):
-			t.Todo = display(t.Todo, "Todo Title: ")
+			tn, e := display(t.Todo, "Todo Title: ")
+			if e == nil {
+				t.Todo = tn
+			}
 		case strings.HasPrefix(out, "Priority"):
 			// Convert this to []rune to allow comparison to 'A' and 'Z' instead
 			// of adding regex or unicode dependency
-			p := []rune(strings.ToUpper(display(t.Priority, "Priority:")))
-			if len(p) > 1 || (len(p) > 0 && (p[0] < 'A' || p[0] > 'Z')) {
+			p, e := display(t.Priority, "Priority:")
+			pn := []rune(strings.ToUpper(p))
+			if len(pn) > 1 || (len(pn) > 0 && (pn[0] < 'A' || pn[0] > 'Z')) {
 				display("", "Priority must be single letter A-Z")
 				break
 			}
-			t.Priority = string(p)
+			if e == nil {
+				t.Priority = string(pn)
+			}
 		case strings.HasPrefix(out, "Projects"):
 			prj := strings.Join(t.Projects, " ") + "\n\n" + strings.Join(projects, "\n")
-			p := display(prj, "Projects (+):")
-			if p != "" {
+			p, e := display(prj, "Projects (+):")
+			if e == nil {
 				t.Projects = strings.Split(p, " ")
-			} else {
-				t.Projects = []string{}
 			}
 		case strings.HasPrefix(out, "Contexts"):
 			cont := strings.Join(t.Contexts, " ") + "\n\n" + strings.Join(contexts, "\n")
-			c := display(cont, "Contexts (+):")
-			if c != "" {
+			c, e := display(cont, "Contexts (+):")
+			if e == nil {
 				t.Contexts = strings.Split(c, " ")
-			} else {
-				t.Contexts = []string{}
 			}
 		case strings.HasPrefix(out, "Due date"):
-			d := display(tdd, "Due Date (yyyy-mm-dd):")
+			d, e := display(tdd, "Due Date (yyyy-mm-dd):")
 			td, err := time.Parse("2006-01-02", d)
-			if err != nil && d != "" {
-				display("", "Bad date format. Should be yyyy-mm-dd.")
-				break
-			} else {
-				t.DueDate = td
+			if e == nil {
+				if err != nil && d != "" {
+					display("", "Bad date format. Should be yyyy-mm-dd.")
+					break
+				} else {
+					t.DueDate = td
+				}
 			}
 		case strings.HasPrefix(out, "Threshold"):
-			d := display(thd, "Threshold Date (yyyy-mm-dd):")
+			d, e := display(thd, "Threshold Date (yyyy-mm-dd):")
 			td, err := time.Parse("2006-01-02", d)
-			if err != nil && d != "" {
-				display("", "Bad date format. Should be yyyy-mm-dd.")
-				break
-			} else {
-				// Threshold date is an additional tag and stored as a string
-				// not as a time object
-				if td.IsZero() {
-					delete(t.AdditionalTags, "t")
+			if e == nil {
+				if err != nil && d != "" {
+					display("", "Bad date format. Should be yyyy-mm-dd.")
+					break
 				} else {
-					t.AdditionalTags["t"] = td.Format("2006-01-02")
+					// Threshold date is an additional tag and stored as a string
+					// not as a time object
+					if td.IsZero() {
+						delete(t.AdditionalTags, "t")
+					} else {
+						t.AdditionalTags["t"] = td.Format("2006-01-02")
+					}
 				}
 			}
 		case strings.HasPrefix(out, "Complete item"):
@@ -286,7 +304,7 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 					continue
 				}
 				if strings.HasPrefix(out, k) {
-					if d := display(v, k); d == "" {
+					if d, e := display(v, k); d == "" && e == nil {
 						delete(t.AdditionalTags, k)
 					} else {
 						t.AdditionalTags[k] = d
@@ -296,10 +314,6 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 			}
 		default:
 			edit = false
-			// Cancel new item if ESC is hit without saving
-			if task.Id == 0 {
-				task.Todo = ""
-			}
 		}
 		if t.Todo != "" {
 			t, _ = todotxt.ParseTask(t.String())
@@ -308,7 +322,7 @@ func editItem(task *todotxt.Task, tasklist *todotxt.TaskList) todotxt.Task {
 	return *task
 }
 
-func display(list string, title string) (result string) {
+func display(list string, title string) (result string, e error) {
 	// Displays list in dmenu, returns selection
 	var out, outErr bytes.Buffer
 	flag.Parse()
@@ -334,7 +348,7 @@ func display(list string, title string) (result string) {
 		} else {
 			// Skip this error when hitting Esc to go back to previous menu
 			if err.Error() == "exit status 1" {
-				return
+				return "", errors.New("escape")
 			}
 			log.Fatal(err.Error())
 		}
